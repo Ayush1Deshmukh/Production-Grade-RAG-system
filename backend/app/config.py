@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # ── LLM (Generative) ──────────────────────────────────────────────────────
     gemini_api_key: str = Field(..., description="Google Gemini API key")
-    llm_model: str = Field("llama3.1-8b", description="Model name for inference")
+    llm_model: str = Field("llama-3.3-70b", description="Model name for inference")
 
     # ── Groq (fallback inference / evaluation) ────────────────────────────────
     groq_api_key: str = Field("", description="Groq API key (optional fallback)")
