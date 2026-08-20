@@ -59,10 +59,13 @@ documents. This is wrapped in LangChain's ContextualCompressionRetriever. The cr
 scores each (query, document) pair together for higher-precision relevance scoring.
 
 ## LLM (Generative Model)
-The RAG system uses Cerebras (gpt-oss-120b) as the primary LLM for answer generation,
-called through the OpenAI-compatible Cerebras API. It uses LangChain's
-with_structured_output in json_mode to bind the LLM to a Pydantic schema, forcing
-structured JSON responses and preventing hallucinated or malformed output.
+The RAG system uses gpt-oss-120b as the primary LLM for answer generation, served by
+Groq and called through its OpenAI-compatible API. The generation backend is selected
+by the LLM_PROVIDER environment variable and both supported backends (Groq and
+Cerebras) speak the same OpenAI-compatible protocol, so switching providers requires
+no code change. It uses LangChain's with_structured_output in json_mode to bind the
+LLM to a Pydantic schema, forcing structured JSON responses and preventing
+hallucinated or malformed output.
 
 ## Vector Database
 Qdrant Cloud is used as the vector database. It provides a free 1GB permanent cluster
@@ -80,7 +83,8 @@ EnsembleRetriever uses Reciprocal Rank Fusion (RRF): score = 1/(k + rank) where 
 The pipeline is evaluated using Ragas with the faithfulness metric. Faithfulness measures
 whether every claim in the generated answer is supported by the retrieved context chunks.
 A score of 1.0 means all claims are grounded in the context. The LLM judge for evaluation
-is gpt-oss-120b running on Cerebras, chosen for reliable JSON-structured grading.
+is gpt-oss-120b, the same model used for inference, chosen for reliable JSON-structured
+grading.
 
 ## CI/CD Quality Gate
 GitHub Actions runs Ragas evaluation on every pull request. The run_evaluation.py script

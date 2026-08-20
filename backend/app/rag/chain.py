@@ -4,7 +4,8 @@ app/rag/chain.py
 Assembles the LCEL (LangChain Expression Language) pipeline.
 Uses `with_structured_output` to strictly bind the LLM to the Pydantic schema,
 preventing JSON hallucinations.
-LLM backend: Cerebras (gpt-oss-120b) — fast inference via OpenAI-compatible API.
+LLM backend: whichever OpenAI-compatible provider `LLM_PROVIDER` selects
+(default: gpt-oss-120b on Groq). See app/config.py.
 """
 
 import time
@@ -40,8 +41,10 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-# Provider hiccups that are worth another attempt. Cerebras returns 429
-# ("queue_exceeded") under load — without this the user just gets a 500.
+# Provider hiccups that are worth another attempt. Free tiers rate-limit hard
+# under load (429) — without this the user just gets a 500. Note that a 402
+# (quota exhausted / billing required) is deliberately NOT retried: retrying a
+# spend limit only delays the same failure.
 TRANSIENT_LLM_ERRORS = (
     RateLimitError,
     APITimeoutError,
@@ -183,12 +186,13 @@ async def execute_rag_pipeline(
     # 4. Prepare Context
     context_str = format_context(docs)
 
-    # 5. LLM Setup (Cerebras — 1M tokens/day, OpenAI-compatible)
+    # 5. LLM Setup — provider and endpoint both come from settings, so moving
+    #    between OpenAI-compatible backends is an env-var change (see config.py).
     llm = ChatOpenAI(
         model=settings.llm_model,
         temperature=0.0,
-        api_key=settings.cerebras_api_key,
-        base_url="https://api.cerebras.ai/v1",
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
     )
     # Force output to exactly match our Pydantic schema using json_mode to prevent tool-calling parsing errors
     structured_llm = llm.with_structured_output(RAGResponse, method="json_mode")

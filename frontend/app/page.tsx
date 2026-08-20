@@ -72,10 +72,10 @@ export default function HomePage() {
           <span className={styles.titleGradient}>RAG Intelligence</span>
         </h1>
         <p className={styles.subtitle}>
-          Hybrid search · Cross-encoder re-ranking · Citation-enforced answers · Cerebras gpt-oss-120b
+          Hybrid search · Cross-encoder re-ranking · Citation-enforced answers · gpt-oss-120b on Groq
         </p>
         <div className={styles.techPills}>
-          {["LangChain", "Qdrant", "MS-MARCO Rerank", "Cerebras", "Ragas CI/CD"].map((t) => (
+          {["LangChain", "Qdrant", "MS-MARCO Rerank", "Groq", "Ragas CI/CD"].map((t) => (
             <span key={t} className={styles.pill}>{t}</span>
           ))}
         </div>
@@ -116,7 +116,7 @@ export default function HomePage() {
           CI/CD Ragas faithfulness gate: ≥ 90%
         </div>
         <div className={styles.footerText}>
-          Built with LangChain · Qdrant Cloud · HuggingFace · Cerebras · Ragas
+          Built with LangChain · Qdrant Cloud · HuggingFace · Groq · Ragas
         </div>
       </footer>
     </main>

@@ -62,8 +62,19 @@ class RAGResponse(BaseModel):
     @field_validator("refusal", mode="before")
     @classmethod
     def cast_boolean_refusal(cls, v: Any) -> Optional[str]:
+        """
+        Tolerate a boolean refusal instead of failing the whole response.
+
+        The prompt asks for a sentence, but models occasionally answer the
+        *question* ("did you refuse?") rather than filling the field. This text
+        is rendered to the user verbatim, so the fallback has to say something
+        useful — "Refused" on its own reads like an error page.
+        """
         if isinstance(v, bool):
-            return "Refused" if v else None
+            return (
+                "The retrieved documents do not contain enough information to "
+                "answer this question."
+            ) if v else None
         return v
 
 

@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
 app = FastAPI(
     title="Production-Grade RAG API",
-    description="Hybrid retrieval (Dense + BM25) with local cross-encoder re-ranking and Cerebras inference.",
+    description="Hybrid retrieval (Dense + BM25) with local cross-encoder re-ranking and gpt-oss-120b inference.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

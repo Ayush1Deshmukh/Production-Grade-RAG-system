@@ -149,7 +149,7 @@ const NODES: DiagramNode[] = [
   {
     id: "llm",
     band: 4,
-    label: "Cerebras",
+    label: "Groq",
     tech: "gpt-oss-120b · json_mode",
     code: "with_structured_output(RAGResponse)",
     snippet: "structured_llm = llm.with_structured_output(\n    RAGResponse, method='json_mode')",

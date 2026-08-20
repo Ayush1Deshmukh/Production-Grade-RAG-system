@@ -2,7 +2,7 @@
   <img src="./docs/dashboard.png" alt="RAG Intelligence dashboard answering a question with citations" width="100%" />
 
   <h1>🚀 Production-Grade RAG System</h1>
-  <p><strong>Hybrid Search • Cross-Encoder Re-Ranking • Citation-Enforced Answers • Cerebras gpt-oss-120b</strong></p>
+  <p><strong>Hybrid Search • Cross-Encoder Re-Ranking • Citation-Enforced Answers • gpt-oss-120b</strong></p>
 
   <p>
     <a href="#-live-demo">Live Demo</a> •
@@ -53,7 +53,7 @@ This system goes far beyond a basic "Semantic Search" RAG tutorial. It implement
 1. 🔍 **Hybrid Retrieval:** When a user asks a question, the query is simultaneously searched using **BM25** (Sparse keyword matching) and **Dense Vector Embeddings** (semantic matching) inside a Qdrant database.
 2. 🎯 **Cross-Encoder Re-Ranking:** The top 10 results from the Hybrid Search are passed through an `ms-marco-MiniLM-L-6-v2` neural network. This Cross-Encoder surgically scores the exact relationship between the query and each chunk, re-ranking them to find the true top 5 results.
 3. 🛡️ **Semantic Deduplication:** Before re-ranking, the retrieved chunks are hashed on their leading content. If two chunks contain identical text (e.g., website navigation bars scraped from multiple pages), the duplicates are stripped out so the cross-encoder and the LLM context window are spent on distinct material.
-4. ⚡ **Sub-second Generation:** The highly refined context is passed into a strict citation-enforcement prompt. It is generated using `gpt-oss-120b` running on **Cerebras Inference hardware**, guaranteeing lightning-fast, millisecond token generation.
+4. ⚡ **Sub-second Generation:** The highly refined context is passed into a strict citation-enforcement prompt, and answered by `gpt-oss-120b` on **Groq's LPU inference hardware**. The model is bound to a Pydantic schema via `json_mode`, so it must return an answer, the chunk IDs supporting it, and a refusal field it is required to use when the context cannot answer the question.
 5. 🎨 **Dynamic UI Rendering:** The Next.js frontend uses physics-based CSS animations to cascade the response onto the screen, rendering hover-glow tooltips that display the exact latency and neural confidence score of every retrieved chunk.
 
 ---
@@ -67,7 +67,7 @@ This system goes far beyond a basic "Semantic Search" RAG tutorial. It implement
 ### ⚙️ Backend & AI Orchestration
 - <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" /> **FastAPI (Python):** Blazing fast async API framework handling the entire orchestration.
 - 🦜 **LangChain (LCEL):** Modular pipeline construction for complex RAG routing and retrieval logic.
-- 🧠 **Cerebras Inference:** Ultra-low latency LLM generation (`gpt-oss-120b`).
+- 🧠 **Pluggable inference:** `gpt-oss-120b` over an OpenAI-compatible endpoint. `LLM_PROVIDER` selects the backend (**Groq** by default, Cerebras also supported) — a provider retiring its free tier is an env-var change, not a code change.
 - 🤗 **HuggingFace Embeddings:** Local dense embeddings via `all-MiniLM-L6-v2`.
 - 🎯 **MS-MARCO Reranker:** Local cross-encoder reranking for maximum precision.
 - <img src="https://img.shields.io/badge/Qdrant-FE4256?style=flat&logo=qdrant&logoColor=white" alt="Qdrant" /> **Qdrant Cloud:** Vector database storing the 384-dim dense index. The sparse side is `rank-bm25` in the app process, fused with the dense hits by LangChain's `EnsembleRetriever` (RRF) and rebuilt from Qdrant on startup.
@@ -132,12 +132,12 @@ Everything outside `backend/` (the frontend, evaluation harness, workflows) neve
 
 | Where | Key | Notes |
 |---|---|---|
-| **HF Space** secrets | `CEREBRAS_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | What the running backend needs |
+| **HF Space** secrets | `GROQ_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | What the running backend needs |
 | **HF Space** secrets | `ALLOWED_ORIGINS` | Your Vercel origin. Not `*` — `ENVIRONMENT=production` refuses it |
 | **HF Space** secrets | `ENVIRONMENT=production` | Enables the CORS wildcard refusal |
 | **HF Space** secrets | `INGEST_API_KEY` | Optional. Unset ⇒ `/ingest` returns `503` (closed by default) |
 | **GitHub** Actions secrets | `HF_TOKEN` | A **write** token from huggingface.co/settings/tokens |
-| **GitHub** Actions secrets | `CEREBRAS_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | For the Ragas gate. Absent ⇒ gate skips, deploy still runs |
+| **GitHub** Actions secrets | `GROQ_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | For the Ragas gate. Absent ⇒ gate skips, deploy still runs |
 | **Vercel** env var | `NEXT_PUBLIC_API_URL` | `https://<user>-<space>.hf.space`, no trailing slash |
 
 ---

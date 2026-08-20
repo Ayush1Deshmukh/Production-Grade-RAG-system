@@ -6,11 +6,39 @@ Pydantic-Settings validates types and raises clear errors on startup
 if any required key is missing — no silent misconfigurations.
 """
 
+import logging
 from functools import lru_cache
-from typing import List
+from typing import Dict, List
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+
+# Generation backends, all speaking the OpenAI-compatible protocol — switching
+# is a base_url and key swap, nothing more. Kept configurable on purpose: this
+# project has already lost one backend to a retired free tier, and the next one
+# should cost an env-var change rather than a code change.
+LLM_ENDPOINTS: Dict[str, str] = {
+    "groq": "https://api.groq.com/openai/v1",
+    "cerebras": "https://api.cerebras.ai/v1",
+}
+
+# The same open weights are published under different ids per provider: Groq
+# namespaces them ("openai/gpt-oss-120b"), Cerebras does not ("gpt-oss-120b").
+# An .env carried over from the other backend would otherwise 404 at the first
+# question, so the id is translated to the selected provider's spelling.
+MODEL_ALIASES: Dict[str, Dict[str, str]] = {
+    "groq": {
+        "gpt-oss-120b": "openai/gpt-oss-120b",
+        "gpt-oss-20b": "openai/gpt-oss-20b",
+    },
+    "cerebras": {
+        "openai/gpt-oss-120b": "gpt-oss-120b",
+        "openai/gpt-oss-20b": "gpt-oss-20b",
+    },
+}
 
 
 class Settings(BaseSettings):
@@ -21,17 +49,25 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Cerebras (inference) ─────────────────────────────────────────────────
-    # The only LLM credential the running system needs.
-    cerebras_api_key: str = Field(..., description="Cerebras API key")
-    llm_model: str = Field("gpt-oss-120b", description="Cerebras model name for inference")
+    # ── LLM (generation) ──────────────────────────────────────────────────────
+    # Only the selected provider's key is required; see `provider_key_present`.
+    llm_provider: str = Field("groq", description=f"Generation backend: one of {sorted(LLM_ENDPOINTS)}")
+    llm_model: str = Field(
+        "openai/gpt-oss-120b",
+        description=(
+            "Model id exactly as the chosen provider names it. The same model is "
+            "'openai/gpt-oss-120b' on Groq and 'gpt-oss-120b' on Cerebras."
+        ),
+    )
+
+    groq_api_key: str = Field("", description="Required when llm_provider='groq'")
+    cerebras_api_key: str = Field("", description="Required when llm_provider='cerebras'")
 
     # ── Unused provider credentials (kept so existing .env files still load) ──
     # Nothing in the codebase reads these: embeddings and re-ranking run locally
     # on HuggingFace models. They are optional so no deploy or CI job has to
     # invent dummy values.
     gemini_api_key: str = Field("", description="Unused; kept for backwards compatibility")
-    groq_api_key: str = Field("", description="Unused; kept for backwards compatibility")
     cohere_api_key: str = Field("", description="Unused; kept for backwards compatibility")
     embedding_model: str = Field("embed-english-v3.0", description="Unused; see retrieval/embedder.py")
     rerank_model: str = Field("rerank-english-v3.0", description="Unused; see retrieval/reranker.py")
@@ -79,6 +115,55 @@ class Settings(BaseSettings):
         if v >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size")
         return v
+
+    @field_validator("llm_provider")
+    @classmethod
+    def known_provider(cls, v: str) -> str:
+        provider = v.strip().lower()
+        if provider not in LLM_ENDPOINTS:
+            raise ValueError(
+                f"LLM_PROVIDER must be one of {sorted(LLM_ENDPOINTS)}, got {v!r}"
+            )
+        return provider
+
+    @model_validator(mode="after")
+    def normalise_model_for_provider(self) -> "Settings":
+        """Translate a known model id into the selected provider's spelling."""
+        renamed = MODEL_ALIASES.get(self.llm_provider, {}).get(self.llm_model)
+        if renamed:
+            logger.warning(
+                "LLM_MODEL=%r is the id used by another provider; using %r for %s.",
+                self.llm_model, renamed, self.llm_provider,
+            )
+            self.llm_model = renamed
+        return self
+
+    @model_validator(mode="after")
+    def provider_key_present(self) -> "Settings":
+        """
+        Require a key for the *selected* provider only.
+
+        Demanding all of them would force every deploy and CI job to invent
+        dummy values for backends it does not use; demanding none would defer
+        the failure to the first user question instead of to startup.
+        """
+        if not self.llm_api_key:
+            raise ValueError(
+                f"{self.llm_provider.upper()}_API_KEY is required when "
+                f"LLM_PROVIDER={self.llm_provider!r}"
+            )
+        return self
+
+    @property
+    def llm_base_url(self) -> str:
+        return LLM_ENDPOINTS[self.llm_provider]
+
+    @property
+    def llm_api_key(self) -> str:
+        return {
+            "groq": self.groq_api_key,
+            "cerebras": self.cerebras_api_key,
+        }[self.llm_provider]
 
     @property
     def cors_origins(self) -> List[str]:

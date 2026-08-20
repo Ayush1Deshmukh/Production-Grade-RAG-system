@@ -5,9 +5,9 @@ Ragas evaluation script.
 Reads the golden dataset and runs faithfulness metric.
 Exits with code 1 if faithfulness < 0.90.
 
-RAG Inference: Cerebras gpt-oss-120b — OpenAI-compatible endpoint
-Ragas Judge:   Cerebras gpt-oss-120b — 120B model for reliable JSON-structured evaluation
-  Both avoid Groq's per-minute token-bucket rate limits.
+Both the RAG inference and the Ragas judge run on whichever OpenAI-compatible
+provider LLM_PROVIDER selects (default: gpt-oss-120b on Groq), so the gate
+needs exactly one free tier to stay alive rather than two.
 """
 
 import asyncio
@@ -109,13 +109,15 @@ def run_ragas_evaluation(results: List[Dict]) -> Dict[str, float]:
     """Run Ragas metrics on collected results."""
     settings = get_settings()
 
-    # Using Cerebras via OpenAI-compatible client — gpt-oss-120b handles Ragas JSON prompts reliably
+    # The judge runs on the same provider as inference: a second backend would
+    # mean a second free tier to keep alive. gpt-oss-120b handles Ragas' JSON
+    # grading prompts reliably.
     ragas_llm = ChatOpenAI(
-        model="gpt-oss-120b",
+        model=settings.llm_model,
         temperature=0.0,
         max_tokens=4096,
-        api_key=settings.cerebras_api_key,
-        base_url="https://api.cerebras.ai/v1",
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
     )
     # Ragas only needs these four columns; drop our bookkeeping fields.
     dataset = Dataset.from_list([

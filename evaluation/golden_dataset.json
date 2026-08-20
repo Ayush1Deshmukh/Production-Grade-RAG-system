@@ -71,7 +71,7 @@
   },
   {
     "question": "What LLM does this RAG system use by default?",
-    "ground_truth": "The system uses Cerebras gpt-oss-120b for answer generation, called through the OpenAI-compatible Cerebras API.",
+    "ground_truth": "The system uses gpt-oss-120b for answer generation, served by Groq and called through its OpenAI-compatible API. The backend is selected by the LLM_PROVIDER environment variable.",
     "ground_truth_context": "Google Gemini 1.5 Flash is used as the LLM. It has a free tier of 15 RPM and 1 million tokens per minute, sufficient for portfolio demonstrations."
   },
   {
