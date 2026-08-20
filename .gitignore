@@ -39,6 +39,7 @@ node_modules/
 out/
 dist/
 .cache/
+.vite/
 *.tsbuildinfo
 
 # ── Docker ────────────────────────────────────────────────────────────────────

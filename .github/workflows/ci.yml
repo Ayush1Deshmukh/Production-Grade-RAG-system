@@ -8,6 +8,10 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
+  # The Space lives at huggingface.co/spaces/Ayush707/rag-backend and is served
+  # from ayush707-rag-backend.hf.space. Both halves must match that owner.
+  HF_USERNAME: Ayush707
+  HF_SPACE: rag-backend
 
 jobs:
   # ─── Job 1: Unit Tests ───────────────────────────────────────────────────────
@@ -53,27 +57,68 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Builds the same image the Space runs, so a broken Dockerfile fails here
+      # rather than after it has been force-pushed to a live Space.
       - name: Build Docker Image
         run: |
           docker build ./backend -t rag-backend:${{ github.sha }}
 
-      - name: Confirm Image Health
+      - name: Smoke-test the image
         run: |
-          echo "Docker image built successfully: rag-backend:${{ github.sha }}"
+          # No credentials are passed, so Qdrant is unreachable on purpose:
+          # /health must still answer (reporting degraded) rather than crash.
+          docker run -d --name rag-smoke -p 7860:7860 \
+            -e CEREBRAS_API_KEY=dummy \
+            -e QDRANT_URL=http://127.0.0.1:1 \
+            -e QDRANT_API_KEY=dummy \
+            rag-backend:${{ github.sha }}
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:7860/health > /tmp/health.json 2>/dev/null; then
+              echo "Container answered /health in ~${i}s:"
+              cat /tmp/health.json
+              # Weights are baked into the image, so a boot this fast also
+              # proves it is not silently downloading them at startup.
+              docker rm -f rag-smoke
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Container never answered /health"
+          docker logs rag-smoke
+          docker rm -f rag-smoke
+          exit 1
 
   # ─── Job 3: Ragas Evaluation Gate ─────────────────────────────────────────
   ragas-evaluation:
     name: Ragas Evaluation Gate
     runs-on: ubuntu-latest
     needs: unit-tests
-    # Only run on pushes to main to save API quota
+    # Only on main: this burns live Cerebras and Qdrant quota.
     if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Without credentials the gate cannot run. Skipping loudly beats failing
+      # the build for a repo whose secrets simply are not configured yet.
+      - name: Check for evaluation credentials
+        id: creds
+        env:
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+        run: |
+          if [ -n "$CEREBRAS_API_KEY" ] && [ -n "$QDRANT_URL" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CEREBRAS_API_KEY/QDRANT_URL not set — skipping the faithfulness gate."
+          fi
+
       - name: Set up Python ${{ env.PYTHON_VERSION }}
+        if: steps.creds.outputs.present == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -81,16 +126,19 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install Backend Dependencies
+        if: steps.creds.outputs.present == 'true'
         run: |
           cd backend
           pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run Ragas Evaluation (Faithfulness Gate > 90%)
+        if: steps.creds.outputs.present == 'true'
         env:
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           QDRANT_URL: ${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          QDRANT_COLLECTION_NAME: ${{ secrets.QDRANT_COLLECTION_NAME || 'rag_documents' }}
           LLM_MODEL: gpt-oss-120b
           LANGFUSE_PUBLIC_KEY: ""
           LANGFUSE_SECRET_KEY: ""
@@ -99,28 +147,70 @@ jobs:
           python ../evaluation/run_evaluation.py
 
       - name: Upload Evaluation Results
-        if: always()
+        if: always() && steps.creds.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: eval-results-${{ github.sha }}
           path: evaluation/eval_results.json
           retention-days: 30
+          if-no-files-found: ignore
 
-  # ─── Job 4: Deploy (on main pass) ────────────────────────────────────────────
+  # ─── Job 4: Deploy to Hugging Face Spaces ────────────────────────────────────
   deploy:
     name: Deploy to Hugging Face Spaces
     runs-on: ubuntu-latest
     needs: [docker-build, ragas-evaluation]
-    if: github.ref == 'refs/heads/main'
+    # Deploy when the image builds and the gate did not *fail*. A skipped gate
+    # (no secrets configured) must not strand the deployment forever.
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.docker-build.result == 'success' &&
+      needs.ragas-evaluation.result != 'failure'
 
     steps:
       - uses: actions/checkout@v4
         with:
+          # subtree split has to walk the full history of backend/.
           fetch-depth: 0
-      
-      - name: Push to Hugging Face Hub
+
+      - name: Push backend/ to the Space root
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add space https://ayushdeshmukh:$HF_TOKEN@huggingface.co/spaces/ayushdeshmukh/rag-backend
-          git push --force space main
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN is not set — add it under Settings ▸ Secrets ▸ Actions."
+            exit 1
+          fi
+
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          # A Space builds from the Dockerfile at ITS repo root, but ours lives
+          # under backend/. subtree split rewrites just that subdirectory into a
+          # standalone history whose root IS backend/, so Dockerfile and the
+          # README carrying the HF frontmatter land where the Space expects them.
+          git subtree split --prefix backend -b hf-deploy
+
+          git push --force \
+            "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" \
+            hf-deploy:main
+
+      - name: Wait for the Space to come back healthy
+        run: |
+          # A green push is not a green deploy: the Space still has to rebuild.
+          echo "Waiting for the Space to rebuild (up to ~10 min)..."
+          sleep 60
+          for i in $(seq 1 40); do
+            body=$(curl -fsS --max-time 20 \
+              "https://${HF_USERNAME,,}-${HF_SPACE}.hf.space/health" 2>/dev/null || true)
+            case "$body" in
+              *'"status":"ok"'*)
+                echo "Space healthy: $body"
+                exit 0 ;;
+            esac
+            echo "  [$i/40] not ready yet..."
+            sleep 15
+          done
+          echo "::error::Space did not report healthy after the rebuild window."
+          exit 1
