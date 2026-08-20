@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="./docs/dashboard.png" alt="RAG Intelligence dashboard answering a question with citations" width="100%" />
+
   <h1>🚀 Production-Grade RAG System</h1>
   <p><strong>Hybrid Search • Cross-Encoder Re-Ranking • Citation-Enforced Answers • Cerebras gpt-oss-120b</strong></p>
 
@@ -32,10 +34,15 @@ The entire application is currently live and deployed!
 
 ## ✦ 📸 Showcase (Frontend UI)
 
-<!-- Add screenshots here: commit them under frontend/public/ (or docs/) and
-     reference them with a relative path, e.g. ./docs/dashboard.png -->
-_Screenshots pending — run the app locally with the steps below to see the dashboard,
-the latency-breakdown tooltips, and the per-chunk confidence scores._
+Expanding **Retrieved Chunks** shows the re-ranker's work directly: the same five
+chunks the LLM saw, each with its cross-encoder confidence and the modality that
+found it. Note how sharply the scores fall off — `93.1%` for the chunk that
+actually answers the question, then `22.7%`, `13.3%`, `0.3%`, `0.2%`. That spread
+is the cross-encoder separating a real match from keyword coincidence.
+
+<div align="center">
+  <img src="./docs/retrieval-scores.png" alt="Expanded retrieved chunks showing per-chunk cross-encoder confidence scores and Hybrid (BM25 + Dense) badges" width="100%" />
+</div>
 
 ---
 
