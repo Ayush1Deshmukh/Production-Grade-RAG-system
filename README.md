@@ -110,8 +110,35 @@ The React UI is deployed on **Vercel**, taking advantage of global Edge CDNs for
 
 ### 2. Backend: Hugging Face Spaces (Docker) <img src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat&logo=huggingface&logoColor=000" alt="Hugging Face" align="right"/>
 The FastAPI Python backend is deployed as a containerized microservice on **Hugging Face Spaces**.
-- **Containerization:** A custom multi-stage `Dockerfile` utilizes a native Python **Virtual Environment (`venv`)** to ensure complex dependencies (like `typing-extensions` and `torch`) are perfectly preserved in the runtime image.
-- **Reliability:** By using Hugging Face's Docker SDK, the backend avoids the 50-second "cold start" sleep cycles common on other free tiers (like Render), keeping the AI pipeline incredibly responsive 24/7.
+- **Containerization:** A multi-stage `Dockerfile` builds into a venv that the runtime stage copies wholesale, so the dependency tree arrives intact without `build-essential` riding along.
+- **Warm cold starts:** The MiniLM embedder and the ms-marco cross-encoder (~180MB) are **baked into the image at build time**. Downloading them on first use would make every cold start wait on `huggingface.co` and turn a hub outage into a failed boot.
+- **Staying awake:** Free Spaces sleep after ~48h idle, so `keep-alive.yml` pings `/health` every 6 hours.
+
+### 3. How the deploy actually happens
+
+A Space builds from the `Dockerfile` at **its** repo root — but here that file lives under `backend/`. The `deploy` job bridges the two with a subtree split:
+
+```bash
+git subtree split --prefix backend -b hf-deploy   # backend/ becomes the repo root
+git push --force "https://…@huggingface.co/spaces/Ayush707/rag-backend" hf-deploy:main
+```
+
+Everything outside `backend/` (the frontend, evaluation harness, workflows) never reaches the Space, and the root `.gitignore` governs what ships — which is what keeps `.env` out of a public repo.
+
+> [!IMPORTANT]
+> **Never commit `.env`.** Credentials belong in **Space secrets** (Settings ▸ Variables and secrets) and **GitHub Actions secrets** — never in a tracked file. A Space repo is world-readable: anything committed there, including in old commits, can be fetched by anyone at `…/raw/main/<path>`.
+
+### 4. Where each credential goes
+
+| Where | Key | Notes |
+|---|---|---|
+| **HF Space** secrets | `CEREBRAS_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | What the running backend needs |
+| **HF Space** secrets | `ALLOWED_ORIGINS` | Your Vercel origin. Not `*` — `ENVIRONMENT=production` refuses it |
+| **HF Space** secrets | `ENVIRONMENT=production` | Enables the CORS wildcard refusal |
+| **HF Space** secrets | `INGEST_API_KEY` | Optional. Unset ⇒ `/ingest` returns `503` (closed by default) |
+| **GitHub** Actions secrets | `HF_TOKEN` | A **write** token from huggingface.co/settings/tokens |
+| **GitHub** Actions secrets | `CEREBRAS_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY` | For the Ragas gate. Absent ⇒ gate skips, deploy still runs |
+| **Vercel** env var | `NEXT_PUBLIC_API_URL` | `https://<user>-<space>.hf.space`, no trailing slash |
 
 ---
 
