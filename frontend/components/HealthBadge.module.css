@@ -1,0 +1,54 @@
+@keyframes badgePulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.checking .dot {
+  background: var(--text-muted);
+  animation: badgePulse 1.4s infinite;
+}
+
+.ok .dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+  animation: badgePulse 2.4s infinite;
+}
+
+.degraded {
+  color: var(--accent-amber);
+}
+
+.degraded .dot {
+  background: var(--accent-amber);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.55);
+}
+
+.down {
+  color: var(--accent-red);
+}
+
+.down .dot {
+  background: var(--accent-red);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none !important; }
+}

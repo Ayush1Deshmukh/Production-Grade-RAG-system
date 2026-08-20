@@ -4,7 +4,7 @@ app/rag/chain.py
 Assembles the LCEL (LangChain Expression Language) pipeline.
 Uses `with_structured_output` to strictly bind the LLM to the Pydantic schema,
 preventing JSON hallucinations.
-LLM backend: Cerebras (llama3.1-8b) — fast inference via OpenAI-compatible API.
+LLM backend: Cerebras (gpt-oss-120b) — fast inference via OpenAI-compatible API.
 """
 
 import time
@@ -13,17 +13,74 @@ from typing import Dict, Any, List
 
 from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
+from starlette.concurrency import run_in_threadpool
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    RateLimitError,
+)
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import get_settings
 from app.models import RAGResponse, ChunkMetadata
 from app.rag.prompt_registry import load_prompt
-from app.retrieval.hybrid_retriever import get_hybrid_retriever
+from app.retrieval.hybrid_retriever import get_hybrid_retriever, is_bm25_ready
 from app.retrieval.reranker import get_reranking_compressor
 from app.retrieval.embedder import get_embeddings
 import math
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+# Provider hiccups that are worth another attempt. Cerebras returns 429
+# ("queue_exceeded") under load — without this the user just gets a 500.
+TRANSIENT_LLM_ERRORS = (
+    RateLimitError,
+    APITimeoutError,
+    APIConnectionError,
+    InternalServerError,
+)
+
+
+@retry(
+    retry=retry_if_exception_type(TRANSIENT_LLM_ERRORS),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+async def _invoke_llm_with_retry(chain, payload: Dict[str, Any], callbacks: list) -> RAGResponse:
+    """Run the LCEL chain, retrying transient provider failures with backoff."""
+    return await chain.ainvoke(payload, config={"callbacks": callbacks})
+
+
+def _extract_langfuse_url(callbacks: list) -> str | None:
+    """
+    Pull the Langfuse trace URL off the callback handler.
+
+    Must be called *after* the handler has seen a run — it returns None until a
+    trace exists, which is why this is not read at the top of the pipeline.
+    """
+    for cb in callbacks or []:
+        getter = getattr(cb, "get_trace_url", None)
+        if getter is None:
+            continue
+        try:
+            url = getter()
+        except Exception:  # a broken trace link must never fail the request
+            logger.debug("Could not read Langfuse trace URL", exc_info=True)
+            continue
+        if url:
+            return url
+    return None
 
 
 def format_context(documents: List[Document]) -> str:
@@ -48,20 +105,18 @@ async def execute_rag_pipeline(
     """
     start_time = time.time()
 
-    # Extract Langfuse trace URL if available
-    langfuse_url = None
-    if callbacks:
-        for cb in callbacks:
-            if hasattr(cb, "get_trace_url"):
-                langfuse_url = cb.get_trace_url()
-
-    # 1. Embedding Timing (mocking the exact call done inside hybrid)
+    # 1. Embedding Timing (mocking the exact call done inside hybrid).
+    # Model inference is CPU-bound and synchronous, so it runs in a worker
+    # thread — on the event loop it would block every other request.
     t_emb = time.time()
-    get_embeddings().embed_query(question)
+    await run_in_threadpool(get_embeddings().embed_query, question)
     embedding_ms = (time.time() - t_emb) * 1000
 
     # 2. Retrieval Setup & Base Retrieval
     t0 = time.time()
+    # Retrieval is only hybrid once a BM25 index exists (i.e. after an ingest in
+    # this process). Report what actually ran instead of hardcoding "Hybrid".
+    retrieval_modality = "Hybrid (BM25 + Dense)" if is_bm25_ready() else "Dense (vector only)"
     base_retriever = await get_hybrid_retriever(collection_name)
     raw_base_docs = await base_retriever.ainvoke(question, config={"callbacks": callbacks})
     
@@ -86,9 +141,10 @@ async def execute_rag_pipeline(
     from app.retrieval.reranker import _get_cross_encoder
     cross_encoder = _get_cross_encoder()
     
-    # Score pairs manually to guarantee metadata isn't dropped by LangChain
+    # Score pairs manually to guarantee metadata isn't dropped by LangChain.
+    # Cross-encoder inference is the heaviest CPU step — keep it off the loop.
     pairs = [[question, doc.page_content] for doc in base_docs]
-    scores = cross_encoder.score(pairs)
+    scores = await run_in_threadpool(cross_encoder.score, pairs)
     
     # Attach raw logits directly to the doc metadata and sort
     for doc, score in zip(base_docs, scores):
@@ -97,6 +153,32 @@ async def execute_rag_pipeline(
     base_docs.sort(key=lambda x: x.metadata["explicit_cross_encoder_score"], reverse=True)
     docs = base_docs[:settings.rerank_top_n]
     reranking_ms = (time.time() - t1) * 1000
+
+    # Nothing retrieved (empty collection, or no matches) — refuse here rather than
+    # asking the LLM to answer from an empty context, which invites hallucination.
+    if not docs:
+        logger.warning("No documents retrieved for query: %s", question)
+        return {
+            "answer": "",
+            "citations": [],
+            "sources": [],
+            "refusal": (
+                "No documents were retrieved from the knowledge base, "
+                "so there is no context to answer this question from."
+            ),
+            "confidence": 0.0,
+            "retrieved_chunks": [],
+            "full_contexts": [],
+            "latency_ms": (time.time() - start_time) * 1000,
+            "latency_breakdown": {
+                "Embedding": round(embedding_ms, 1),
+                "Hybrid Search": round(hybrid_search_ms, 1),
+                "Reranking": round(reranking_ms, 1),
+                "LLM Generation": 0.0,
+            },
+            "langfuse_url": _extract_langfuse_url(callbacks),
+            "prompt_version": settings.prompt_version,
+        }
 
     # 4. Prepare Context
     context_str = format_context(docs)
@@ -118,9 +200,10 @@ async def execute_rag_pipeline(
     # 7. Generate Response
     t2 = time.time()
     logger.info("Generating response with structured output...")
-    rag_response: RAGResponse = await chain.ainvoke(
+    rag_response: RAGResponse = await _invoke_llm_with_retry(
+        chain,
         {"context": context_str, "question": question},
-        config={"callbacks": callbacks}
+        callbacks,
     )
     llm_generation_ms = (time.time() - t2) * 1000
 
@@ -149,7 +232,7 @@ async def execute_rag_pipeline(
                 source=doc.metadata.get("source", "unknown"),
                 content_preview=doc.page_content[:200] + "...",
                 score=confidence_score,
-                retrieval_modality="Hybrid (BM25 + Dense)",
+                retrieval_modality=retrieval_modality,
             )
         )
 
@@ -170,6 +253,6 @@ async def execute_rag_pipeline(
             "Reranking": round(reranking_ms, 1),
             "LLM Generation": round(llm_generation_ms, 1)
         },
-        "langfuse_url": langfuse_url,
+        "langfuse_url": _extract_langfuse_url(callbacks),
         "prompt_version": settings.prompt_version,
     }

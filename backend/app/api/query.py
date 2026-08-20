@@ -42,6 +42,10 @@ async def query_rag(request: QueryRequest) -> QueryResponse:
 
         return QueryResponse(**result_dict)
 
-    except Exception as e:
+    except Exception:
+        # Log the full traceback server-side; never echo internals (URLs, keys) to the client.
         logger.exception("Pipeline execution failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="RAG pipeline failed. See server logs for details.",
+        )

@@ -1,4 +1,7 @@
-/* globals.css — Design system for RAG Intelligence UI */
+/* globals.css — Design system for RAG Intelligence UI
+   Every surface colour is a token so the light and dark themes stay in sync.
+   The theme is chosen by the `data-theme` attribute on <html>, set before
+   first paint by the inline script in layout.tsx (no flash of wrong theme). */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
@@ -9,36 +12,137 @@
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* Palette */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Dark theme (default) ─────────────────────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
   --bg-base:        #05050f;
   --bg-surface:     #0d0d1f;
   --bg-panel:       rgba(255, 255, 255, 0.04);
   --bg-panel-hover: rgba(255, 255, 255, 0.07);
+  --bg-subtle:      rgba(255, 255, 255, 0.02);
 
   --border:         rgba(255, 255, 255, 0.08);
+  --border-strong:  rgba(255, 255, 255, 0.14);
   --border-accent:  rgba(139, 92, 246, 0.4);
 
   --text-primary:   #f0f0ff;
   --text-secondary: #9898b8;
   --text-muted:     #5a5a80;
+  --text-inverse:   #ffffff;
 
   --accent-purple:  #8b5cf6;
   --accent-blue:    #3b82f6;
   --accent-cyan:    #06b6d4;
   --accent-green:   #10b981;
   --accent-red:     #ef4444;
+  --accent-amber:   #fbbf24;
+
+  --accent-purple-soft: rgba(139, 92, 246, 0.12);
+  --accent-purple-line: rgba(139, 92, 246, 0.26);
 
   --gradient-brand: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
-  --gradient-glow:  radial-gradient(ellipse 60% 40% at 50% 0%, rgba(139,92,246,0.15), transparent);
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  /* Component surfaces */
+  --node-bg:        linear-gradient(145deg, rgba(255,255,255,0.062), rgba(255,255,255,0.02));
+  --node-bg-hover:  linear-gradient(145deg, rgba(139,92,246,0.16), rgba(59,130,246,0.07));
+  --node-bg-solid:  linear-gradient(145deg, rgba(17,17,34,0.97), rgba(11,11,24,0.97));
+  --code-bg:        rgba(5, 5, 15, 0.6);
+  --code-border:    rgba(139, 92, 246, 0.16);
+  --code-text:      #a5b4fc;
+  --overlay-bg:     rgba(9, 9, 22, 0.98);
+  --tooltip-bg:     #111111;
 
-  --shadow-glow: 0 0 40px rgba(139, 92, 246, 0.2);
-  --shadow-panel: 0 4px 32px rgba(0,0,0,0.5);
-  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --grid-line:      rgba(139, 92, 246, 0.03);
+  --board-grid:     rgba(139, 92, 246, 0.045);
+  --page-glow:      rgba(139, 92, 246, 0.12);
+  --band-bg:        linear-gradient(180deg, rgba(139,92,246,0.035), rgba(255,255,255,0.012));
+
+  --wire-base:      rgba(139, 92, 246, 0.34);
+  --wire-arrow:     rgba(139, 92, 246, 0.75);
+  --port-fill:      rgba(9, 9, 22, 0.95);
+  --slab-color:     rgba(139, 92, 246, 0.4);
+
+  --skeleton-a:     rgba(255, 255, 255, 0.04);
+  --skeleton-b:     rgba(255, 255, 255, 0.09);
+  --track:          rgba(255, 255, 255, 0.08);
+
+  --shadow-glow:    0 0 40px rgba(139, 92, 246, 0.2);
+  --shadow-panel:   0 4px 32px rgba(0, 0, 0, 0.5);
+  --shadow-node:    0 3px 14px rgba(0, 0, 0, 0.4);
+  --shadow-lift:    0 26px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(139, 92, 246, 0.3);
+  --shadow-overlay: 0 22px 55px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base:        #f5f5fb;
+  --bg-surface:     #ffffff;
+  --bg-panel:       rgba(255, 255, 255, 0.78);
+  --bg-panel-hover: rgba(255, 255, 255, 0.95);
+  --bg-subtle:      rgba(99, 91, 255, 0.035);
+
+  --border:         rgba(24, 20, 70, 0.11);
+  --border-strong:  rgba(24, 20, 70, 0.18);
+  --border-accent:  rgba(109, 40, 217, 0.35);
+
+  --text-primary:   #16143a;
+  --text-secondary: #4a4a70;
+  --text-muted:     #7b7a9c;
+  --text-inverse:   #ffffff;
+
+  /* Deeper accents so text and strokes clear WCAG contrast on white */
+  --accent-purple:  #6d28d9;
+  --accent-blue:    #2563eb;
+  --accent-cyan:    #0e7490;
+  --accent-green:   #059669;
+  --accent-red:     #dc2626;
+  --accent-amber:   #b45309;
+
+  --accent-purple-soft: rgba(109, 40, 217, 0.09);
+  --accent-purple-line: rgba(109, 40, 217, 0.22);
+
+  --gradient-brand: linear-gradient(135deg, #7c3aed 0%, #2563eb 50%, #0891b2 100%);
+
+  --node-bg:        linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,246,255,0.9));
+  --node-bg-hover:  linear-gradient(145deg, rgba(109,40,217,0.09), rgba(37,99,235,0.06));
+  --node-bg-solid:  linear-gradient(145deg, #ffffff, #f7f6ff);
+  --code-bg:        #f3f2fd;
+  --code-border:    rgba(109, 40, 217, 0.16);
+  --code-text:      #5b21b6;
+  --overlay-bg:     rgba(255, 255, 255, 0.99);
+  --tooltip-bg:     #ffffff;
+
+  --grid-line:      rgba(109, 40, 217, 0.045);
+  --board-grid:     rgba(109, 40, 217, 0.05);
+  --page-glow:      rgba(124, 58, 237, 0.12);
+  --band-bg:        linear-gradient(180deg, rgba(109,40,217,0.045), rgba(255,255,255,0.5));
+
+  --wire-base:      rgba(109, 40, 217, 0.38);
+  --wire-arrow:     rgba(109, 40, 217, 0.8);
+  --port-fill:      #ffffff;
+  --slab-color:     rgba(109, 40, 217, 0.32);
+
+  --skeleton-a:     rgba(24, 20, 70, 0.05);
+  --skeleton-b:     rgba(24, 20, 70, 0.11);
+  --track:          rgba(24, 20, 70, 0.1);
+
+  --shadow-glow:    0 0 40px rgba(109, 40, 217, 0.14);
+  --shadow-panel:   0 6px 28px rgba(38, 25, 92, 0.1);
+  --shadow-node:    0 3px 14px rgba(38, 25, 92, 0.09);
+  --shadow-lift:    0 24px 50px rgba(38, 25, 92, 0.18), 0 0 34px rgba(109, 40, 217, 0.16);
+  --shadow-overlay: 0 22px 50px rgba(38, 25, 92, 0.22);
 }
 
 html { scroll-behavior: smooth; }
@@ -51,6 +155,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 /* ── Background Grid ──────────────────────────────────────────────────────── */
@@ -59,8 +164,8 @@ body::before {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
@@ -74,7 +179,7 @@ body::after {
   transform: translateX(-50%);
   width: 800px;
   height: 500px;
-  background: radial-gradient(ellipse, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  background: radial-gradient(ellipse, var(--page-glow) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -91,13 +196,13 @@ body::after {
 
 .glass-accent {
   border-color: var(--border-accent);
-  box-shadow: var(--shadow-panel), 0 0 0 1px rgba(139,92,246,0.1);
+  box-shadow: var(--shadow-panel), 0 0 0 1px var(--accent-purple-soft);
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-surface); }
-::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.4); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--accent-purple-line); border-radius: 3px; }
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes fadeUp {

@@ -1,0 +1,539 @@
+/* Keyframes live in this file on purpose: CSS Modules scopes animation names,
+   so referencing globals.css keyframes here would resolve to a hashed name
+   that does not exist and the animation would silently never run. */
+@keyframes nodeIn {
+  from { opacity: 0; transform: translateY(18px) translateZ(-40px); }
+  to   { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+
+@keyframes titleShimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes caretBlink {
+  0%, 45%  { opacity: 1; }
+  50%, 95% { opacity: 0; }
+  100%     { opacity: 1; }
+}
+
+@keyframes typeIn {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes dashFlow {
+  to { stroke-dashoffset: -220; }
+}
+
+@keyframes codeDrift {
+  0%   { transform: translate3d(0, 10px, -180px) rotateX(14deg); opacity: 0; }
+  15%  { opacity: 0.5; }
+  85%  { opacity: 0.5; }
+  100% { transform: translate3d(0, -120px, -60px) rotateX(14deg); opacity: 0; }
+}
+
+@keyframes slabPulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* ── Heading ─────────────────────────────────────────────────────────────── */
+.heading {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: var(--gradient-brand);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: titleShimmer 9s linear infinite;
+}
+
+.subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* ── 3D board ────────────────────────────────────────────────────────────── */
+.board {
+  position: relative;
+  perspective: 1600px;
+  perspective-origin: 50% 38%;
+  padding: 18px 0 10px;
+  /* Blueprint grid — reads as a technical drawing surface. */
+  background-image:
+    linear-gradient(var(--board-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--board-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  border-radius: var(--radius-xl);
+  mask-image: radial-gradient(ellipse 85% 90% at 50% 45%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 90% at 50% 45%, #000 55%, transparent 100%);
+}
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.swatchDense { background: rgba(59, 130, 246, 0.85); }
+.swatchSparse { background: rgba(6, 182, 212, 0.85); }
+.swatchFlow {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(139, 92, 246, 0.9) 0 4px,
+    transparent 4px 7px
+  );
+}
+
+.plane {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg));
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Layer band ──────────────────────────────────────────────────────────── */
+.band {
+  position: relative;
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  align-items: stretch;
+  gap: 14px;
+  padding: 14px 16px 14px 0;
+  border: 1px dashed var(--accent-purple-line);
+  border-radius: var(--radius-lg);
+  background: var(--band-bg);
+  transform-style: preserve-3d;
+  transition: border-color 0.35s ease, background 0.35s ease;
+}
+
+.band:hover {
+  border-color: var(--border-accent);
+}
+
+.bandLabel {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg) translateZ(6px);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.band:hover .bandLabel {
+  color: var(--accent-purple);
+}
+
+.bandIndex {
+  padding: 3px 4px;
+  border-radius: 4px;
+  color: var(--accent-purple);
+  background: var(--accent-purple-soft);
+  border: 1px solid var(--accent-purple-line);
+  letter-spacing: 0.08em;
+}
+
+.bandBody {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transform-style: preserve-3d;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  transform-style: preserve-3d;
+}
+
+/* The parallel dense/sparse branch */
+.forkRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  transform-style: preserve-3d;
+}
+
+.nodeWrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  transform-style: preserve-3d;
+}
+
+/* ── Node ────────────────────────────────────────────────────────────────── */
+.node {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 15px 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--node-bg);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  transform-style: preserve-3d;
+  opacity: 0;
+  animation: nodeIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease,
+    background 0.3s ease;
+  box-shadow: var(--shadow-node);
+}
+
+/* Extruded base — reads as a solid block sitting on the plane. */
+.slab {
+  position: absolute;
+  inset: auto 4px -7px 4px;
+  height: 10px;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: linear-gradient(180deg, var(--slab-color), transparent);
+  transform: translateZ(-18px);
+  opacity: 0.55;
+  transition: opacity 0.35s ease, transform 0.4s ease;
+}
+
+.node:hover,
+.node:focus-visible {
+  outline: none;
+  transform: translateZ(46px) translateY(-4px) rotateX(4deg);
+  border-color: var(--border-accent);
+  background: var(--node-bg-hover);
+  box-shadow: var(--shadow-lift);
+}
+
+.node:hover .slab,
+.node:focus-visible .slab {
+  opacity: 1;
+  transform: translateZ(-30px);
+}
+
+.nodeHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  transform: translateZ(14px);
+}
+
+.nodeLabel {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nodeTech {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  transform: translateZ(8px);
+}
+
+.nodeCode {
+  position: relative;
+  display: block;
+  margin-top: 4px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--code-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateZ(22px);
+  transition: color 0.3s ease, border-color 0.3s ease, transform 0.4s ease;
+}
+
+.node:hover .nodeCode,
+.node:focus-visible .nodeCode {
+  color: var(--accent-purple);
+  border-color: var(--border-accent);
+  transform: translateZ(40px);
+}
+
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 0.72em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--accent-cyan);
+  opacity: 0;
+}
+
+.node:hover .caret,
+.node:focus-visible .caret,
+.active .caret {
+  animation: caretBlink 1.1s steps(1) infinite;
+}
+
+.timing {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 100px;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.24);
+}
+
+.metric {
+  font-size: 0.63rem;
+  padding: 2px 7px;
+  border-radius: 100px;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* ── Accents for the parallel branches ───────────────────────────────────── */
+.dense { border-color: rgba(59, 130, 246, 0.28); }
+.dense .nodeCode { border-color: rgba(59, 130, 246, 0.28); color: var(--accent-blue); }
+.dense .slab { background: linear-gradient(180deg, rgba(59, 130, 246, 0.45), transparent); }
+
+.sparse { border-color: rgba(6, 182, 212, 0.28); }
+.sparse .nodeCode { border-color: rgba(6, 182, 212, 0.3); color: var(--accent-cyan); }
+.sparse .slab { background: linear-gradient(180deg, rgba(6, 182, 212, 0.45), transparent); }
+
+.llm { border-color: rgba(139, 92, 246, 0.35); }
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.active {
+  border-color: var(--accent-purple);
+  background: var(--node-bg-hover);
+  transform: translateZ(34px) scale(1.02);
+  box-shadow: var(--shadow-lift);
+}
+
+.active .slab {
+  opacity: 1;
+  animation: slabPulse 1s ease-in-out infinite;
+}
+
+.done { border-color: rgba(16, 185, 129, 0.26); }
+.done .nodeLabel::after {
+  content: " ✓";
+  color: var(--accent-green);
+  font-size: 0.8em;
+}
+
+/* ── Hover panel with typed snippet ──────────────────────────────────────── */
+.panel {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  width: min(420px, 88vw);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--overlay-bg);
+  border: 1px solid var(--border-accent);
+  box-shadow: var(--shadow-overlay);
+  transform: translate(-50%, -6px) translateZ(80px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  z-index: 40;
+}
+
+.panelOpen {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) translateZ(80px);
+}
+
+.snippet {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: var(--code-text);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.panelOpen .snippet {
+  animation: typeIn 0.65s steps(38, end) both;
+}
+
+.detailText {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* ── Connector wires ─────────────────────────────────────────────────────── */
+.wires {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.wire {
+  fill: none;
+  stroke: var(--wire-base);
+  stroke-width: 1.5;
+}
+
+.wireFlow {
+  fill: none;
+  stroke: url(#wireGrad);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 7 13;
+  opacity: 0.75;
+  transition: opacity 0.3s ease, stroke-width 0.3s ease;
+}
+
+/* Connection ports where a wire meets a block */
+.port {
+  fill: var(--port-fill);
+  stroke: var(--wire-arrow);
+  stroke-width: 1.4;
+  transition: stroke 0.3s ease, r 0.3s ease;
+}
+
+.portLit {
+  stroke: var(--accent-cyan);
+  filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.9));
+}
+
+.wireRunning {
+  animation: dashFlow 1.6s linear infinite;
+}
+
+.wireLit {
+  opacity: 1;
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.8));
+}
+
+/* ── Drifting code fragments ─────────────────────────────────────────────── */
+.codeField {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.floatCode {
+  position: absolute;
+  left: calc(4% + (var(--i) * 11.6%));
+  bottom: -40px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--accent-purple);
+  opacity: 0.55;
+  white-space: nowrap;
+  animation: codeDrift 15s linear infinite;
+  animation-delay: calc(var(--i) * -1.9s);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .band { grid-template-columns: 26px 1fr; gap: 8px; padding: 12px 10px 12px 0; }
+  .bandLabel { font-size: 0.55rem; letter-spacing: 0.1em; }
+  .forkRow { grid-template-columns: 1fr; gap: 18px; }
+  .row, .bandBody { gap: 18px; }
+  /* The fork stacks vertically here, so a wire passes behind the upper block —
+     an opaque surface stops it bleeding through the glass. */
+  .node {
+    max-width: none;
+    padding: 11px 12px 12px;
+    background: var(--node-bg-solid);
+  }
+  .node:hover,
+  .node:focus-visible {
+    background: var(--node-bg-hover), var(--node-bg-solid);
+  }
+  .nodeCode { font-size: 0.6rem; }
+  .floatCode { display: none; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .node,
+  .plane,
+  .slab,
+  .nodeCode {
+    animation: none;
+    transition: none;
+    opacity: 1;
+  }
+  .node { opacity: 1; }
+  .node:hover,
+  .node:focus-visible { transform: none; border-color: rgba(139, 92, 246, 0.5); }
+  .title,
+  .caret,
+  .wireRunning,
+  .floatCode { animation: none; }
+  .panelOpen .snippet { animation: none; }
+}

@@ -71,7 +71,7 @@
   },
   {
     "question": "What LLM does this RAG system use by default?",
-    "ground_truth": "The system uses Google Gemini 1.5 Flash via the Google Gemini API free tier.",
+    "ground_truth": "The system uses Cerebras gpt-oss-120b for answer generation, called through the OpenAI-compatible Cerebras API.",
     "ground_truth_context": "Google Gemini 1.5 Flash is used as the LLM. It has a free tier of 15 RPM and 1 million tokens per minute, sufficient for portfolio demonstrations."
   },
   {
@@ -86,7 +86,7 @@
   },
   {
     "question": "What vector database is used in this RAG system?",
-    "ground_truth": "Qdrant Cloud is used as the vector database. It provides a free 1GB permanent cluster and natively supports hybrid search with sparse and dense vectors.",
+    "ground_truth": "Qdrant Cloud is used as the vector database, storing the 384-dimensional dense index. Sparse BM25 retrieval runs in the application via rank-bm25 and is fused with dense results by LangChain's EnsembleRetriever.",
     "ground_truth_context": "Qdrant Cloud is chosen for its permanent free tier, low latency, and native support for both dense semantic vectors and sparse BM25 vectors."
   },
   {
@@ -96,7 +96,7 @@
   },
   {
     "question": "What embedding model is used?",
-    "ground_truth": "The system uses Cohere's embed-english-v3.0 model, which produces 1024-dimensional embeddings on the free developer tier.",
+    "ground_truth": "The system uses the local HuggingFace sentence-transformer all-MiniLM-L6-v2, which produces 384-dimensional embeddings and runs on-device without API calls.",
     "ground_truth_context": "Cohere's embed-english-v3.0 is a state-of-the-art embedding model producing 1024-dim vectors. It is available for free on the developer tier."
   }
 ]

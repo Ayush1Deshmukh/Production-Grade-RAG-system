@@ -21,20 +21,20 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── LLM (Generative) ──────────────────────────────────────────────────────
-    gemini_api_key: str = Field(..., description="Google Gemini API key")
-    llm_model: str = Field("llama3.1-8b", description="Model name for inference")
-
-    # ── Groq (fallback inference / evaluation) ────────────────────────────────
-    groq_api_key: str = Field("", description="Groq API key (optional fallback)")
-
-    # ── Cerebras (primary fast inference) ────────────────────────────────────
+    # ── Cerebras (inference) ─────────────────────────────────────────────────
+    # The only LLM credential the running system needs.
     cerebras_api_key: str = Field(..., description="Cerebras API key")
+    llm_model: str = Field("gpt-oss-120b", description="Cerebras model name for inference")
 
-    # ── Cohere (embeddings + rerank) ──────────────────────────────────────────
-    cohere_api_key: str = Field(..., description="Cohere API key")
-    embedding_model: str = Field("embed-english-v3.0")
-    rerank_model: str = Field("rerank-english-v3.0")
+    # ── Unused provider credentials (kept so existing .env files still load) ──
+    # Nothing in the codebase reads these: embeddings and re-ranking run locally
+    # on HuggingFace models. They are optional so no deploy or CI job has to
+    # invent dummy values.
+    gemini_api_key: str = Field("", description="Unused; kept for backwards compatibility")
+    groq_api_key: str = Field("", description="Unused; kept for backwards compatibility")
+    cohere_api_key: str = Field("", description="Unused; kept for backwards compatibility")
+    embedding_model: str = Field("embed-english-v3.0", description="Unused; see retrieval/embedder.py")
+    rerank_model: str = Field("rerank-english-v3.0", description="Unused; see retrieval/reranker.py")
 
     # ── Qdrant ────────────────────────────────────────────────────────────────
     qdrant_url: str = Field(..., description="Qdrant Cloud cluster URL")
@@ -58,6 +58,20 @@ class Settings(BaseSettings):
     log_level: str = Field("INFO")
     allowed_origins: str = Field("http://localhost:3000")
 
+    # ── Ingest protection ─────────────────────────────────────────────────────
+    # /ingest makes the server fetch arbitrary URLs and write them into the
+    # vector store, so it is disabled until a key is configured.
+    ingest_api_key: str = Field(
+        "", description="Shared secret required in the X-API-Key header on /ingest"
+    )
+    ingest_allowed_domains: str = Field(
+        "",
+        description=(
+            "Comma-separated hostname suffixes /ingest may fetch "
+            "(e.g. 'python.langchain.com,docs.qdrant.tech'). Empty = any public host."
+        ),
+    )
+
     @field_validator("chunk_overlap")
     @classmethod
     def overlap_less_than_size(cls, v: int, info) -> int:
@@ -73,6 +87,19 @@ class Settings(BaseSettings):
     @property
     def langfuse_enabled(self) -> bool:
         return bool(self.langfuse_public_key and self.langfuse_secret_key)
+
+    @property
+    def ingest_enabled(self) -> bool:
+        """/ingest stays closed until a shared secret is configured."""
+        return bool(self.ingest_api_key)
+
+    @property
+    def ingest_domain_allowlist(self) -> List[str]:
+        return [d.strip().lower() for d in self.ingest_allowed_domains.split(",") if d.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
 
 
 @lru_cache(maxsize=1)

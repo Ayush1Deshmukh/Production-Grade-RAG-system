@@ -25,8 +25,8 @@
   gap: 8px;
   padding: 6px 16px;
   border-radius: 100px;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid var(--accent-purple-line);
+  background: var(--accent-purple-soft);
   font-size: 12px;
   font-weight: 500;
   color: var(--accent-purple);
@@ -36,8 +36,8 @@
 }
 
 .badge:hover {
-  background: rgba(139, 92, 246, 0.15);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+  background: var(--accent-purple-soft);
+  box-shadow: var(--shadow-glow);
   transform: translateY(-1px);
 }
 
@@ -46,34 +46,13 @@
   height: 6px;
   border-radius: 50%;
   background: var(--accent-green);
-  animation: pulse-glow 2s infinite;
+  /* Local keyframes: a global name here would be module-scoped and never run. */
+  animation: badgeDotPulse 2s infinite;
 }
 
-.heroImageContainer {
-  width: 100%;
-  max-width: 400px;
-  margin: 10px auto;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 10px 40px rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.heroImageContainer:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 20px 50px rgba(139, 92, 246, 0.3);
-  border-color: rgba(139, 92, 246, 0.4);
-}
-
-.heroImage {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: cover;
-  border-radius: var(--radius-lg);
+@keyframes badgeDotPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
 }
 
 .title {
@@ -110,26 +89,48 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+  perspective: 700px;
 }
 
 .pill {
   padding: 4px 12px;
   border-radius: 100px;
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: default;
 }
 
 .pill:hover {
-  border-color: rgba(139, 92, 246, 0.4);
-  background: rgba(139, 92, 246, 0.1);
-  color: #c4b5fd;
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+  border-color: var(--border-accent);
+  background: var(--accent-purple-soft);
+  color: var(--accent-purple);
+  transform: translateZ(26px) translateY(-3px) rotateX(-10deg);
+  box-shadow: var(--shadow-lift);
+}
+
+/* ── Hero depth ───────────────────────────────────────────────────────────── */
+.header {
+  perspective: 1000px;
+}
+
+.title {
+  transform-style: preserve-3d;
+  animation: heroFloat 7s ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateZ(0) rotateX(0deg); }
+  50%      { transform: translateZ(22px) rotateX(2.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title { animation: none; }
+  .pill:hover { transform: translateY(-2px); }
 }
 
 /* ── Sections ────────────────────────────────────────────────────────────── */
@@ -140,8 +141,8 @@
 .errorBox {
   padding: 16px 20px;
   border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.06);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--accent-red);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -164,25 +165,28 @@
   font-family: var(--font-mono);
 }
 
+/* Neutral shell — HealthBadge supplies the colour for the live state, so this
+   must not hardcode green. */
 .healthStatus {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  padding: 4px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 4px 14px;
   border-radius: 100px;
-  color: var(--accent-green);
   font-weight: 500;
   letter-spacing: 0.02em;
+  transition: border-color 0.3s ease, background 0.3s ease;
 }
 
-.healthDot {
-  width: 6px;
-  height: 6px;
-  background: #10b981;
-  border-radius: 50%;
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.healthStatus:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--border-accent);
+}
+
+.healthDivider {
+  opacity: 0.4;
 }
 
 @keyframes pulse {
@@ -194,6 +198,20 @@
   opacity: 0.7;
 }
 
+/* ── Pipeline section ─────────────────────────────────────────────────────── */
+.archSection {
+  margin-top: 8px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+  animation: sectionIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
 @media (max-width: 640px) {
   .main { padding: 40px 16px 32px; gap: 28px; }
+  .archSection { padding-top: 24px; }
+}
+
+@keyframes sectionIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

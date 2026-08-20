@@ -9,10 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a virtual environment to ensure all packages are kept perfectly intact
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --prefix=/install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
 FROM python:3.11-slim AS runtime
@@ -21,7 +25,9 @@ RUN useradd --create-home appuser
 
 WORKDIR /app
 
-COPY --from=builder /install /usr/local
+# Copy the exact virtual environment from the builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
@@ -31,6 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY app/ ./app/
 COPY prompts/ ./prompts/
+# Needed to seed the vector store from inside the container/Space.
+COPY scripts/ ./scripts/
 
 RUN mkdir -p /app/data/corpus && chown -R appuser:appuser /app
 

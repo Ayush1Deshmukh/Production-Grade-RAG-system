@@ -1,8 +1,10 @@
 """
 app/retrieval/embedder.py
 ─────────────────────────
-Cohere Embeddings wrapper.
-Using 'embed-english-v3.0' which is industry standard and has a generous free tier.
+Embeddings wrapper.
+Uses the local HuggingFace sentence-transformer 'all-MiniLM-L6-v2' (384 dims),
+which runs on-device with no API calls or rate limits. The Qdrant collection is
+created with size=384 to match — changing the model means recreating the collection.
 """
 
 from functools import lru_cache

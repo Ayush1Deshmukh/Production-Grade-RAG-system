@@ -5,7 +5,7 @@ Ragas evaluation script.
 Reads the golden dataset and runs faithfulness metric.
 Exits with code 1 if faithfulness < 0.90.
 
-RAG Inference: Cerebras llama3.1-8b — 1M tokens/day free, OpenAI-compatible
+RAG Inference: Cerebras gpt-oss-120b — OpenAI-compatible endpoint
 Ragas Judge:   Cerebras gpt-oss-120b — 120B model for reliable JSON-structured evaluation
   Both avoid Groq's per-minute token-bucket rate limits.
 """
@@ -20,9 +20,8 @@ from typing import Dict, List
 
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision
+from ragas.metrics import faithfulness
 from ragas.run_config import RunConfig
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -74,22 +73,28 @@ async def collect_results(questions: List[Dict]) -> List[Dict]:
             result = await run_single_question(question)
             results.append({
                 "question": question,
-                "answer": result.get("answer", result.get("refusal", "")),
+                "answer": result.get("answer") or "",
+                # A refusal is a *correct* outcome when the context lacks the answer,
+                # so it is tracked separately instead of masquerading as an empty answer.
+                "refusal": result.get("refusal") or "",
                 # Use the FULL page_content, not the 200-char content_preview.
                 # Ragas faithfulness requires the complete retrieved text to verify claims.
-                "contexts": result.get("full_contexts", [
+                "contexts": result.get("full_contexts") or [
                     chunk.content_preview
                     for chunk in result.get("retrieved_chunks", [])
-                ]),
+                ],
                 "ground_truth": ground_truth,
+                "error": "",
             })
         except Exception as e:
             logger.error("Failed on question %d: %s", i + 1, e)
             results.append({
                 "question": question,
                 "answer": "",
+                "refusal": "",
                 "contexts": [],
                 "ground_truth": ground_truth,
+                "error": f"{type(e).__name__}: {e}",
             })
 
         # Enforce rate limit — sleep between questions
@@ -112,11 +117,11 @@ def run_ragas_evaluation(results: List[Dict]) -> Dict[str, float]:
         api_key=settings.cerebras_api_key,
         base_url="https://api.cerebras.ai/v1",
     )
-    ragas_embeddings = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",
-    )
-
-    dataset = Dataset.from_list(results)
+    # Ragas only needs these four columns; drop our bookkeeping fields.
+    dataset = Dataset.from_list([
+        {k: r[k] for k in ("question", "answer", "contexts", "ground_truth")}
+        for r in results
+    ])
 
     logger.info("Running Ragas evaluation metrics (Max workers=1 to prevent 429s)...")
     run_config = RunConfig(max_workers=1, max_retries=15, max_wait=60)
@@ -137,19 +142,24 @@ async def main():
         questions = json.load(f)
 
     import os
-    # Invalidate cache if it exists but contains empty answers (from previous failed runs)
+    # Reuse cached inference only when it came from a clean run of the current
+    # schema. Rows that errored out (not rows that legitimately refused) mean the
+    # cache is stale and inference has to run again.
+    results = None
     if os.path.exists(RESULTS_PATH):
         with open(RESULTS_PATH, "r") as f:
             cached = json.load(f)
-        empty_count = sum(1 for r in cached if not r.get("answer", "").strip())
-        if empty_count > 0:
-            logger.warning("Cache has %d empty answers (from prior 404 failures). Re-running inference.", empty_count)
+        stale_schema = any("refusal" not in r for r in cached)
+        errored = sum(1 for r in cached if r.get("error"))
+        if stale_schema or errored:
+            reason = "written by an older version" if stale_schema else f"contains {errored} failed rows"
+            logger.warning("Cache at %s %s — re-running inference.", RESULTS_PATH, reason)
             os.remove(RESULTS_PATH)
         else:
             logger.info("Found valid cache at %s (%d entries), skipping inference.", RESULTS_PATH, len(cached))
             results = cached
 
-    if not os.path.exists(RESULTS_PATH):
+    if results is None:
         logger.info("Running %d questions through the RAG pipeline...", len(questions))
         results = await collect_results(questions)
 
@@ -158,14 +168,28 @@ async def main():
             json.dump(results, f, indent=2)
         logger.info("Raw results saved to %s", RESULTS_PATH)
 
-    # Filter out failed rows (empty answers) before Ragas to prevent NaN propagation
-    valid_results = [r for r in results if r.get("answer", "").strip()]
-    skipped = len(results) - len(valid_results)
-    if skipped > 0:
-        logger.warning("Skipping %d entries with empty answers before Ragas evaluation.", skipped)
-    results = valid_results
+    # Partition the run. A refusal is correct behaviour when the retrieved context
+    # cannot support an answer, so it is reported as its own rate rather than being
+    # scored for faithfulness (a refusal is never "grounded in the context") or
+    # silently dropped, which would flatter the gate.
+    errored = [r for r in results if r.get("error")]
+    refused = [r for r in results if not r.get("error") and not r["answer"].strip()]
+    answered = [r for r in results if not r.get("error") and r["answer"].strip()]
 
-    scores = run_ragas_evaluation(results)
+    logger.info(
+        "Run breakdown: %d answered, %d refused, %d errored (of %d)",
+        len(answered), len(refused), len(errored), len(results),
+    )
+    for r in errored:
+        logger.error("  pipeline error on %r -> %s", r["question"][:70], r["error"])
+    for r in refused:
+        logger.info("  refused: %r", r["question"][:70])
+
+    if not answered:
+        logger.error("GATE FAILED: no question produced an answer to score.")
+        return False
+
+    scores = run_ragas_evaluation(answered)
 
     # Safely extract aggregate scores from EvaluationResult
     import math
@@ -196,13 +220,20 @@ async def main():
         faithfulness_score = 0.0
         
     logger.info("=" * 60)
-    logger.info("EVALUATION RESULTS")
-    logger.info("  Faithfulness:      %.3f", faithfulness_score)
-    logger.info("  Answer Relevancy:  %.3f", scores_dict.get("answer_relevancy", 0.0))
-    logger.info("  Context Precision: %.3f", scores_dict.get("context_precision", 0.0))
+    logger.info("EVALUATION RESULTS (%d of %d questions scored)", len(answered), len(results))
+    # Only faithfulness is computed above — printing metrics that never ran as
+    # 0.000 made passing runs look like failures.
+    for name, value in scores_dict.items():
+        logger.info("  %-18s %.3f", name.replace("_", " ").title() + ":", value)
+    logger.info("  %-18s %.3f (%d/%d)", "Refusal rate:",
+                len(refused) / len(results), len(refused), len(results))
     logger.info("=" * 60)
 
     # ── CI/CD Gate ────────────────────────────────────────────────────────────
+    if errored:
+        logger.error("GATE FAILED: %d question(s) crashed the pipeline.", len(errored))
+        return False
+
     if faithfulness_score < FAITHFULNESS_THRESHOLD:
         logger.error(
             "GATE FAILED: Faithfulness score %.3f is below threshold %.2f",

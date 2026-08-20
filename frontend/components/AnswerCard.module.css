@@ -1,12 +1,19 @@
+/* Declared locally: CSS Modules scopes animation names, so a reference to
+   the globals.css keyframes resolves to a hashed name that does not exist. */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .card {
   padding: 0;
   overflow: hidden;
-  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card:hover {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-panel);
   transform: translateY(-2px);
 }
 
@@ -20,7 +27,7 @@
   justify-content: space-between;
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
-  background: rgba(255,255,255,0.02);
+  background: var(--bg-subtle);
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -46,7 +53,7 @@
   top: 100%;
   left: 0;
   margin-top: 8px;
-  background: #111111;
+  background: var(--tooltip-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
@@ -59,7 +66,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  box-shadow: var(--shadow-overlay);
 }
 .latencyHoverGroup:hover .latencyTooltip {
   opacity: 1;
@@ -83,7 +90,7 @@
   font-family: var(--font-mono);
   color: var(--accent-purple);
   text-decoration: none;
-  background: rgba(139, 92, 246, 0.1);
+  background: var(--accent-purple-soft);
   padding: 2px 8px;
   border-radius: 4px;
   transition: background 0.2s ease;
@@ -93,7 +100,7 @@
 .confidenceBar {
   width: 80px;
   height: 4px;
-  background: rgba(255,255,255,0.08);
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -108,7 +115,7 @@
 .answerBody { padding: 24px 24px 16px; }
 
 .refusalText {
-  color: #fca5a5;
+  color: var(--accent-red);
   font-style: italic;
   line-height: 1.7;
   font-size: 0.95rem;
@@ -124,22 +131,22 @@
 .markdownBody code {
   font-family: var(--font-mono);
   font-size: 0.85em;
-  background: rgba(139,92,246,0.1);
-  border: 1px solid rgba(139,92,246,0.2);
+  background: var(--accent-purple-soft);
+  border: 1px solid var(--accent-purple-line);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #c4b5fd;
+  color: var(--code-text);
 }
 .markdownBody pre {
-  background: rgba(0,0,0,0.4);
-  border: 1px solid var(--border);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
   border-radius: var(--radius-sm);
   padding: 16px;
   overflow-x: auto;
   margin: 12px 0;
 }
 .markdownBody pre code { background: none; border: none; padding: 0; }
-.markdownBody strong { color: white; font-weight: 600; }
+.markdownBody strong { color: var(--text-primary); font-weight: 700; }
 
 /* ── Sections ────────────────────────────────────────────────────────────── */
 .section {
@@ -165,19 +172,19 @@
 .citationList { display: flex; flex-wrap: wrap; gap: 6px; }
 .citationChip {
   padding: 3px 10px;
-  background: rgba(139,92,246,0.1);
-  border: 1px solid rgba(139,92,246,0.25);
+  background: var(--accent-purple-soft);
+  border: 1px solid var(--accent-purple-line);
   border-radius: 6px;
   font-size: 11px;
-  color: #c4b5fd;
+  color: var(--code-text);
   font-family: var(--font-mono);
   transition: all 0.2s ease;
   cursor: default;
 }
 
 .citationChip:hover {
-  background: rgba(139,92,246,0.2);
-  border-color: rgba(139,92,246,0.5);
+  background: var(--accent-purple-soft);
+  border-color: var(--border-accent);
   transform: translateY(-1px);
 }
 
@@ -214,7 +221,7 @@
 }
 
 .chunkCard {
-  background: rgba(255,255,255,0.02);
+  background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px;
@@ -226,10 +233,10 @@
 }
 
 .chunkCard:hover {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: var(--bg-panel-hover);
+  border-color: var(--border-accent);
   transform: translateY(-2px) scale(1.01);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-panel);
 }
 
 .chunkHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
@@ -238,8 +245,8 @@
 .modalityBadge {
   display: inline-block;
   align-self: flex-start;
-  background: rgba(30, 58, 138, 0.3); /* bg-blue-900/30 */
-  color: #60a5fa; /* text-blue-400 */
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--accent-blue);
   font-size: 10px; /* text-xs equivalent */
   padding: 2px 6px;
   border-radius: 4px;

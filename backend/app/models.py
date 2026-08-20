@@ -54,6 +54,8 @@ class RAGResponse(BaseModel):
 
     confidence: float = Field(
         default=1.0,
+        ge=0.0,
+        le=1.0,
         description="Self-assessed confidence score between 0 and 1.",
     )
 

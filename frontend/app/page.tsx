@@ -5,6 +5,8 @@ import styles from "./page.module.css";
 import QueryInput from "@/components/QueryInput";
 import AnswerCard from "@/components/AnswerCard";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
+import ArchitectureDiagram from "@/components/ArchitectureDiagram";
+import HealthBadge from "@/components/HealthBadge";
 
 interface QueryResponse {
   answer: string;
@@ -70,7 +72,7 @@ export default function HomePage() {
           <span className={styles.titleGradient}>RAG Intelligence</span>
         </h1>
         <p className={styles.subtitle}>
-          Hybrid search · Cross-encoder re-ranking · Citation-enforced answers · Cerebras Llama-3.1-8b
+          Hybrid search · Cross-encoder re-ranking · Citation-enforced answers · Cerebras gpt-oss-120b
         </p>
         <div className={styles.techPills}>
           {["LangChain", "Qdrant", "MS-MARCO Rerank", "Cerebras", "Ragas CI/CD"].map((t) => (
@@ -100,11 +102,18 @@ export default function HomePage() {
         )}
       </section>
 
+      {/* Architecture — idle by default, lights up stage by stage during a
+          query, then shows the real per-stage timings from the response. */}
+      <section className={styles.archSection}>
+        <ArchitectureDiagram loading={loading} data={response} />
+      </section>
+
       {/* Footer */}
       <footer className={styles.footer}>
         <div className={styles.healthStatus}>
-          <span className={styles.healthDot} />
-          System Operational | CI/CD Ragas Faithfulness: 94.5%
+          <HealthBadge />
+          <span className={styles.healthDivider}>|</span>
+          CI/CD Ragas faithfulness gate: ≥ 90%
         </div>
         <div className={styles.footerText}>
           Built with LangChain · Qdrant Cloud · HuggingFace · Cerebras · Ragas

@@ -1,8 +1,6 @@
 <div align="center">
-  <img src="./frontend/public/hero.png" alt="RAG Intelligence Architecture" width="100%" />
-  
   <h1>🚀 Production-Grade RAG System</h1>
-  <p><strong>Hybrid Search • Cross-Encoder Re-Ranking • Citation-Enforced Answers • Cerebras Llama-3.1-8b</strong></p>
+  <p><strong>Hybrid Search • Cross-Encoder Re-Ranking • Citation-Enforced Answers • Cerebras gpt-oss-120b</strong></p>
 
   <p>
     <a href="#-live-demo">Live Demo</a> •
@@ -34,11 +32,10 @@ The entire application is currently live and deployed!
 
 ## ✦ 📸 Showcase (Frontend UI)
 
-<div align="center">
-  <!-- NOTE: Add your real screenshots to the /docs folder and update these paths! -->
-  <img src="https://via.placeholder.com/800x450/111111/8b5cf6?text=Frontend+Dashboard+-+Add+Screenshot+1+Here" alt="Frontend Dashboard" width="48%" />
-  <img src="https://via.placeholder.com/800x450/111111/10b981?text=Latency+Tooltips+-+Add+Screenshot+2+Here" alt="Observability Tooltips" width="48%" />
-</div>
+<!-- Add screenshots here: commit them under frontend/public/ (or docs/) and
+     reference them with a relative path, e.g. ./docs/dashboard.png -->
+_Screenshots pending — run the app locally with the steps below to see the dashboard,
+the latency-breakdown tooltips, and the per-chunk confidence scores._
 
 ---
 
@@ -48,8 +45,8 @@ This system goes far beyond a basic "Semantic Search" RAG tutorial. It implement
 
 1. 🔍 **Hybrid Retrieval:** When a user asks a question, the query is simultaneously searched using **BM25** (Sparse keyword matching) and **Dense Vector Embeddings** (semantic matching) inside a Qdrant database.
 2. 🎯 **Cross-Encoder Re-Ranking:** The top 10 results from the Hybrid Search are passed through an `ms-marco-MiniLM-L-6-v2` neural network. This Cross-Encoder surgically scores the exact relationship between the query and each chunk, re-ranking them to find the true top 5 results.
-3. 🛡️ **Semantic Deduplication:** Custom middleware intercepts the re-ranked chunks and hashes their content. If two chunks contain identical text (e.g., website navigation bars scraped from multiple pages), the duplicates are stripped out to save LLM context window space.
-4. ⚡ **Sub-second Generation:** The highly refined context is passed into a strict citation-enforcement prompt. It is generated using `Llama-3.1-8b` running on **Cerebras Inference hardware**, guaranteeing lightning-fast, millisecond token generation.
+3. 🛡️ **Semantic Deduplication:** Before re-ranking, the retrieved chunks are hashed on their leading content. If two chunks contain identical text (e.g., website navigation bars scraped from multiple pages), the duplicates are stripped out so the cross-encoder and the LLM context window are spent on distinct material.
+4. ⚡ **Sub-second Generation:** The highly refined context is passed into a strict citation-enforcement prompt. It is generated using `gpt-oss-120b` running on **Cerebras Inference hardware**, guaranteeing lightning-fast, millisecond token generation.
 5. 🎨 **Dynamic UI Rendering:** The Next.js frontend uses physics-based CSS animations to cascade the response onto the screen, rendering hover-glow tooltips that display the exact latency and neural confidence score of every retrieved chunk.
 
 ---
@@ -63,10 +60,10 @@ This system goes far beyond a basic "Semantic Search" RAG tutorial. It implement
 ### ⚙️ Backend & AI Orchestration
 - <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" /> **FastAPI (Python):** Blazing fast async API framework handling the entire orchestration.
 - 🦜 **LangChain (LCEL):** Modular pipeline construction for complex RAG routing and retrieval logic.
-- 🧠 **Cerebras Inference:** Ultra-low latency LLM generation (`llama3.1-8b`).
+- 🧠 **Cerebras Inference:** Ultra-low latency LLM generation (`gpt-oss-120b`).
 - 🤗 **HuggingFace Embeddings:** Local dense embeddings via `all-MiniLM-L6-v2`.
 - 🎯 **MS-MARCO Reranker:** Local cross-encoder reranking for maximum precision.
-- <img src="https://img.shields.io/badge/Qdrant-FE4256?style=flat&logo=qdrant&logoColor=white" alt="Qdrant" /> **Qdrant Cloud:** Vector Database handling both sparse (BM25) and dense indexes.
+- <img src="https://img.shields.io/badge/Qdrant-FE4256?style=flat&logo=qdrant&logoColor=white" alt="Qdrant" /> **Qdrant Cloud:** Vector database storing the 384-dim dense index. The sparse side is `rank-bm25` in the app process, fused with the dense hits by LangChain's `EnsembleRetriever` (RRF) and rebuilt from Qdrant on startup.
 
 ---
 
@@ -87,10 +84,11 @@ The project is structured as a scalable monorepo separating the UI layer from th
  ┃ ┣ 📜 Dockerfile             # 🐳 Containerization config (Python venv for HF)
  ┃ ┗ 📜 requirements.txt       # 📦 Python Dependencies
  ┃
+ ┣ 📂 evaluation/              # 🧪 Golden dataset + Ragas faithfulness gate
+ ┃
  ┗ 📂 frontend/                # 🖥️ Next.js React Frontend (User Interface)
    ┣ 📂 app/                   # 📄 Next.js App Router (page.tsx, layout.tsx)
    ┣ 📂 components/            # 🧩 UI Components (AnswerCard, QueryInput, Tooltips)
-   ┣ 📂 public/                # 🖼️ Static Assets (hero.png, RAG Architecture images)
    ┗ 📜 package.json           # 📦 Node Dependencies
 ```
 
@@ -125,12 +123,46 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Duplicate .env.example to .env and fill in your API keys
-cp .env.example .env
+# Duplicate .env.example (it lives at the repo root) and fill in your API keys
+cp ../.env.example .env
+
+# Seed the vector store — without this the knowledge base is empty and
+# every question comes back as a refusal
+python scripts/seed.py
 
 # Start the FastAPI server
 uvicorn app.main:app --reload --port 8000
 ```
+
+> The container image serves on port **7860** (Hugging Face Spaces convention).
+> `docker compose up` maps it to `http://localhost:8000`.
+
+### 4. Securing the write path
+
+`POST /api/v1/ingest` makes the **server** fetch the URLs you hand it, so it is
+closed by default and refuses any target that resolves to a private, loopback,
+or link-local address (e.g. cloud metadata at `169.254.169.254`).
+
+```bash
+# Generate a secret and put it in backend/.env as INGEST_API_KEY
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+| Variable | Effect |
+|---|---|
+| `INGEST_API_KEY` | Required in the `X-API-Key` header. Unset ⇒ `/ingest` returns `503 disabled`. |
+| `INGEST_ALLOWED_DOMAINS` | Optional hostname-suffix allowlist, e.g. `python.langchain.com`. Empty ⇒ any public host. |
+| `ALLOWED_ORIGINS` | Browser origins allowed to call the API. `*` is refused when `ENVIRONMENT=production`. |
+
+```bash
+curl -X POST http://localhost:8000/api/v1/ingest \
+  -H "X-API-Key: $INGEST_API_KEY" -H "Content-Type: application/json" \
+  -d '{"urls": ["https://python.langchain.com/docs/concepts/"]}'
+```
+
+> **Deploying:** set `ALLOWED_ORIGINS` on the backend host to your frontend's
+> origin. The default is `http://localhost:3000`, which will block your
+> deployed frontend.
 
 ### 3. Frontend Setup
 ```bash

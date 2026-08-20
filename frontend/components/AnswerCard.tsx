@@ -44,10 +44,14 @@ export default function AnswerCard({ response }: Props) {
           <div className={`${styles.statusBadge} ${isRefusal ? styles.statusRefusal : styles.statusSuccess}`}>
             {isRefusal ? "⚠ No Answer" : "✓ Answered"}
           </div>
-          <div className={styles.metaItem}>
-            <span className={styles.metaLabel}>Confidence</span>
-            <span className={styles.metaValue}>{confidencePct}%</span>
-          </div>
+          {/* A refusal carries no answer confidence — showing one reads as
+              "100% sure of nothing", so it is omitted here. */}
+          {!isRefusal && (
+            <div className={styles.metaItem}>
+              <span className={styles.metaLabel}>Confidence</span>
+              <span className={styles.metaValue}>{confidencePct}%</span>
+            </div>
+          )}
           <div className={`${styles.metaItem} ${styles.latencyHoverGroup}`}>
             <span className={styles.metaLabel}>Latency</span>
             <span className={styles.metaValue}>{Math.round(response.latency_ms)}ms</span>

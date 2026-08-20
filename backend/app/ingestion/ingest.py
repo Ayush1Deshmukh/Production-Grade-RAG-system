@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.ingestion.loader import load_directory, load_urls
 from app.ingestion.chunker import chunk_documents
 from app.retrieval.vector_store import get_vector_store
+from app.retrieval.hybrid_retriever import initialize_bm25_from_docs
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -34,6 +35,10 @@ async def ingest_pipeline(
     chunks = chunk_documents(documents)
     if not chunks:
         return 0
+
+    # Index the same chunks in BM25 so sparse hits carry `chunk_id` metadata
+    # and can be cited exactly like dense hits.
+    await initialize_bm25_from_docs(chunks)
 
     target_collection = collection_name or settings.qdrant_collection_name
     vector_store = await get_vector_store(collection_name=target_collection)

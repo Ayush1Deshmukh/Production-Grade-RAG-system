@@ -15,7 +15,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.ingestion.loader import load_urls, load_directory
 from app.ingestion.ingest import ingest_pipeline
-from app.retrieval.hybrid_retriever import initialize_bm25_from_docs
 
 
 URLS = [
@@ -60,16 +59,16 @@ documents. This is wrapped in LangChain's ContextualCompressionRetriever. The cr
 scores each (query, document) pair together for higher-precision relevance scoring.
 
 ## LLM (Generative Model)
-The RAG system uses Google Gemini (gemini-2.0-flash) as the primary LLM for answer
-generation via the Google Gemini API. It uses LangChain's with_structured_output to
-bind the LLM to a Pydantic schema, forcing structured JSON responses and preventing
-hallucinated or malformed output.
+The RAG system uses Cerebras (gpt-oss-120b) as the primary LLM for answer generation,
+called through the OpenAI-compatible Cerebras API. It uses LangChain's
+with_structured_output in json_mode to bind the LLM to a Pydantic schema, forcing
+structured JSON responses and preventing hallucinated or malformed output.
 
 ## Vector Database
 Qdrant Cloud is used as the vector database. It provides a free 1GB permanent cluster
-and supports both dense semantic vector search and sparse BM25 vectors for hybrid search.
-Qdrant's EnsembleRetriever combines dense retrieval with BM25 sparse retrieval using
-Reciprocal Rank Fusion (RRF) to merge results.
+and supports both dense semantic vector search and sparse vectors for hybrid search.
+In this system the sparse side is handled by LangChain's EnsembleRetriever, which
+merges dense and BM25 results using Reciprocal Rank Fusion (RRF).
 
 ## Hybrid Search
 The system uses LangChain's EnsembleRetriever combining:
@@ -81,7 +80,7 @@ EnsembleRetriever uses Reciprocal Rank Fusion (RRF): score = 1/(k + rank) where 
 The pipeline is evaluated using Ragas with the faithfulness metric. Faithfulness measures
 whether every claim in the generated answer is supported by the retrieved context chunks.
 A score of 1.0 means all claims are grounded in the context. The LLM judge for evaluation
-is llama-3.1-8b-instant running on Groq for ultra-fast inference.
+is gpt-oss-120b running on Cerebras, chosen for reliable JSON-structured grading.
 
 ## CI/CD Quality Gate
 GitHub Actions runs Ragas evaluation on every pull request. The run_evaluation.py script
@@ -143,11 +142,9 @@ async def main():
 
     print(f"\n📊 Total documents loaded: {len(all_docs)}")
 
-    # 4. Initialize BM25 index
-    print("🔍 Initializing BM25 index...")
-    await initialize_bm25_from_docs(all_docs)
-
-    # 5. Chunk and upsert to Qdrant
+    # 4. Chunk, index in BM25, and upsert to Qdrant.
+    #    ingest_pipeline builds the BM25 index from the *chunks*, so sparse hits
+    #    carry the same chunk_id metadata the citations rely on.
     print("⬆️  Chunking and upserting to Qdrant with 384-dim MiniLM embeddings...")
     chunks_added = await ingest_pipeline(all_docs)
 
