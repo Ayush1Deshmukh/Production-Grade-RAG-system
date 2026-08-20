@@ -104,17 +104,30 @@ jobs:
 
       # Without credentials the gate cannot run. Skipping loudly beats failing
       # the build for a repo whose secrets simply are not configured yet.
+      # Which secret is "the" key depends on LLM_PROVIDER, so every provider's
+      # secret is passed in and the matching one is picked here.
       - name: Check for evaluation credentials
         id: creds
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'gemini' }}
           QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          if [ -n "$GROQ_API_KEY" ] && [ -n "$QDRANT_URL" ]; then
+          case "$LLM_PROVIDER" in
+            groq) KEY="$GROQ_API_KEY" ;;
+            cerebras) KEY="$CEREBRAS_API_KEY" ;;
+            gemini) KEY="$GEMINI_API_KEY" ;;
+            openrouter) KEY="$OPENROUTER_API_KEY" ;;
+            *) KEY="" ;;
+          esac
+          if [ -n "$KEY" ] && [ -n "$QDRANT_URL" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::GROQ_API_KEY/QDRANT_URL not set — skipping the faithfulness gate."
+            echo "::warning::No secret for LLM_PROVIDER=$LLM_PROVIDER, or QDRANT_URL not set — skipping the faithfulness gate."
           fi
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
@@ -135,14 +148,18 @@ jobs:
       - name: Run Ragas Evaluation (Faithfulness Gate > 90%)
         if: steps.creds.outputs.present == 'true'
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           QDRANT_URL: ${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
           QDRANT_COLLECTION_NAME: ${{ secrets.QDRANT_COLLECTION_NAME || 'rag_documents' }}
-          # To move the gate to another backend, set these two (and that
-          # provider's key secret) — no code change required.
-          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'groq' }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'openai/gpt-oss-120b' }}
+          # To move the gate to another backend, set these two repo Variables
+          # (Settings ▸ Secrets and variables ▸ Actions ▸ Variables) plus that
+          # provider's key Secret — no code or workflow change required.
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'gemini' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'gemini-3.5-flash-lite' }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           LANGFUSE_PUBLIC_KEY: ""
           LANGFUSE_SECRET_KEY: ""
         run: |

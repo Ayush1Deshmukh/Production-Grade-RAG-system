@@ -12,7 +12,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "RAG Intelligence — Production-Grade Retrieval System",
   description:
-    "A production-grade RAG system using LangChain, Qdrant, and gpt-oss-120b. Hybrid search with cross-encoder re-ranking and strict citation enforcement.",
+    "A production-grade RAG system using LangChain, Qdrant, and Gemini. Hybrid search with cross-encoder re-ranking and strict citation enforcement.",
   keywords: ["RAG", "LangChain", "Qdrant", "AI", "LLM", "Retrieval"],
 };
 

@@ -149,8 +149,8 @@ const NODES: DiagramNode[] = [
   {
     id: "llm",
     band: 4,
-    label: "Groq",
-    tech: "gpt-oss-120b · json_mode",
+    label: "Gemini",
+    tech: "gemini-3.5-flash-lite · json_mode",
     code: "with_structured_output(RAGResponse)",
     snippet: "structured_llm = llm.with_structured_output(\n    RAGResponse, method='json_mode')",
     detail:
