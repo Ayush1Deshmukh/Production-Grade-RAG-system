@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 LLM_ENDPOINTS: Dict[str, str] = {
     "groq": "https://api.groq.com/openai/v1",
     "cerebras": "https://api.cerebras.ai/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "github": "https://models.github.ai/inference",
+}
+
+# Which settings field holds each provider's credential.
+PROVIDER_KEY_FIELDS: Dict[str, str] = {
+    "groq": "groq_api_key",
+    "cerebras": "cerebras_api_key",
+    "gemini": "gemini_api_key",
+    "openrouter": "openrouter_api_key",
+    "github": "github_token",
 }
 
 # The same open weights are published under different ids per provider: Groq
@@ -60,14 +72,16 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Only the key for the selected provider is required; the rest stay blank.
     groq_api_key: str = Field("", description="Required when llm_provider='groq'")
     cerebras_api_key: str = Field("", description="Required when llm_provider='cerebras'")
+    gemini_api_key: str = Field("", description="Required when llm_provider='gemini'")
+    openrouter_api_key: str = Field("", description="Required when llm_provider='openrouter'")
+    github_token: str = Field("", description="Required when llm_provider='github' (needs models:read)")
 
     # ── Unused provider credentials (kept so existing .env files still load) ──
-    # Nothing in the codebase reads these: embeddings and re-ranking run locally
-    # on HuggingFace models. They are optional so no deploy or CI job has to
-    # invent dummy values.
-    gemini_api_key: str = Field("", description="Unused; kept for backwards compatibility")
+    # Nothing reads this: embeddings and re-ranking run locally on HuggingFace
+    # models, so no Cohere credential is needed.
     cohere_api_key: str = Field("", description="Unused; kept for backwards compatibility")
     embedding_model: str = Field("embed-english-v3.0", description="Unused; see retrieval/embedder.py")
     rerank_model: str = Field("rerank-english-v3.0", description="Unused; see retrieval/reranker.py")
@@ -149,7 +163,7 @@ class Settings(BaseSettings):
         """
         if not self.llm_api_key:
             raise ValueError(
-                f"{self.llm_provider.upper()}_API_KEY is required when "
+                f"{self.llm_key_env_var} is required when "
                 f"LLM_PROVIDER={self.llm_provider!r}"
             )
         return self
@@ -160,10 +174,12 @@ class Settings(BaseSettings):
 
     @property
     def llm_api_key(self) -> str:
-        return {
-            "groq": self.groq_api_key,
-            "cerebras": self.cerebras_api_key,
-        }[self.llm_provider]
+        return getattr(self, PROVIDER_KEY_FIELDS[self.llm_provider])
+
+    @property
+    def llm_key_env_var(self) -> str:
+        """Name of the env var the selected provider expects, for error messages."""
+        return PROVIDER_KEY_FIELDS[self.llm_provider].upper()
 
     @property
     def cors_origins(self) -> List[str]:

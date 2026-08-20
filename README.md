@@ -67,7 +67,7 @@ This system goes far beyond a basic "Semantic Search" RAG tutorial. It implement
 ### ⚙️ Backend & AI Orchestration
 - <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" /> **FastAPI (Python):** Blazing fast async API framework handling the entire orchestration.
 - 🦜 **LangChain (LCEL):** Modular pipeline construction for complex RAG routing and retrieval logic.
-- 🧠 **Pluggable inference:** `gpt-oss-120b` over an OpenAI-compatible endpoint. `LLM_PROVIDER` selects the backend (**Groq** by default, Cerebras also supported) — a provider retiring its free tier is an env-var change, not a code change.
+- 🧠 **Pluggable inference:** `gpt-oss-120b` over an OpenAI-compatible endpoint. `LLM_PROVIDER` picks the backend — Groq, Gemini, OpenRouter, GitHub Models, or Cerebras — so a provider retiring its free tier or suspending an account is an env-var change, not an outage. Verify any provider before deploying it with `python scripts/check_provider.py`, which asserts the model can actually do `json_mode` and will refuse an unanswerable question.
 - 🤗 **HuggingFace Embeddings:** Local dense embeddings via `all-MiniLM-L6-v2`.
 - 🎯 **MS-MARCO Reranker:** Local cross-encoder reranking for maximum precision.
 - <img src="https://img.shields.io/badge/Qdrant-FE4256?style=flat&logo=qdrant&logoColor=white" alt="Qdrant" /> **Qdrant Cloud:** Vector database storing the 384-dim dense index. The sparse side is `rank-bm25` in the app process, fused with the dense hits by LangChain's `EnsembleRetriever` (RRF) and rebuilt from Qdrant on startup.
